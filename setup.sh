@@ -3,17 +3,11 @@ apt install wget
 
 pip install -U pip
 
-pip install kaggle
-pip install tqdm
-pip install imageio
-pip install comet_ml
-pip install matplotlib
-pip install jupyter
-pip install tensorflow-datasets
+pip install kaggle tqdm imageio comet_ml matplotlib jupyter tensorflow-datasets
 
 # fix duplicate tensorboard version issue
 pip uninstall tb-nightly tensorboard tensorflow-estimator tensorflow-estimator-2.0-preview tensorflow-gpu tf-estimator-nightly tf-nightly-2.0-preview tf-nightly-gpu
-pip install tensorflow-gpu==2.0.0
+pip install -y tensorflow-gpu==2.0.0
 
 # [tensorboard setup]
 # [remote] run tensorboard:  --logdir logs --port 6006 --bind-all &
