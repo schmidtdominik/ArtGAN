@@ -1,15 +1,12 @@
+apt update
 apt install psmisc # killall command
 apt install wget
+apt install unzip
 
 pip install -U pip
-
-pip install kaggle tqdm imageio comet_ml matplotlib jupyter tensorflow-datasets
-
-# fix duplicate tensorboard version issue
-pip uninstall tb-nightly tensorboard tensorflow-estimator tensorflow-estimator-2.0-preview tensorflow-gpu tf-estimator-nightly tf-nightly-2.0-preview tf-nightly-gpu
-pip install -y tensorflow-gpu==2.0.0
-
-# [tensorboard setup]
-# [remote] run tensorboard:  --logdir logs --port 6006 --bind-all &
-# [remote] jupyter notebook --ip=127.0.0.1 --port=8080 --allow-root &
-# [local] ssh -N -f -L localhost:16006:localhost:6006 -p 28442 root@ssh5.vast.ai
+apt-get -y install libsm6 libxrender-dev libxrender1 libfontconfig1
+pip install kaggle tqdm imageio comet_ml matplotlib jupyter matplotlib
+pip install opencv-python
+python3 -m pip install opencv-contrib-python
+apt install -y libgtk2.0-dev# to get opencv to work
+wget https://gist.githubusercontent.com/schmidtdominik/4d520346c6e5e528f51b332bb7bb8788/raw/0a332b580098c84003370fcdab2afc575252e3ff/dl_from_gdrive.py

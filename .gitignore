@@ -1,5 +1,6 @@
 .kaggle
-unused/downloaded
-unused/dsset
-unused/PBN_crops
-unused/train
+old_stuff/unused/downloaded
+old_stuff/unused/dsset
+old_stuff/unused/PBN_crops
+old_stuff/unused/train
+*.key
