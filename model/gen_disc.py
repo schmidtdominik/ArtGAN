@@ -176,7 +176,6 @@ class Discriminator(nn.Module):
             nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
             nn.LeakyReLU(0.01, inplace=True),
             nn.Conv2d(depth_modifier * depth_levels[0], 1, 4, 1, 0),  # TODO: bias=False?
-            nn.LeakyReLU(0.01, inplace=True),
         ))
 
         self.downsample = nn.AvgPool2d(2, stride=2, padding=0)
