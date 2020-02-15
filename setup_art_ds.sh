@@ -1,16 +1,16 @@
 echo
-# max 90 gb required
+# min 100GB gb required
 # upload these to the server
 # .kaggle/, bam_dataset_download/*.py, model/ PBN-convert-multi*
 
 # alternatively, download celebA
-# !python3 dl_from_gdrive.py 1e0ESqLn9ViaD3pFwVvUHL-6Y5I5yffgP ./celeba.zip
-# !mkdir celeba
-# !mv celeba.zip celeba/celeba.zip
-# !cd celeba && unzip celeba.zip
+# python3 dl_from_gdrive.py 1e0ESqLn9ViaD3pFwVvUHL-6Y5I5yffgP ./celeba.zip
+# mkdir celeba
+# mv celeba.zip celeba/celeba.zip
+# cd celeba && unzip celeba.zip
 
 mkdir bam_dataset_download
-echo Downloading pickled bam url data
+echo Downloading prepickled bam url data
 python3 dl_from_gdrive.py 1iCTIDKGZhWHaOEiGSKiQo9AV5B1wFa_O ./data/bam_dataset_download/bam.pickle
 
 kaggle competitions download painter-by-numbers -f train.zip;

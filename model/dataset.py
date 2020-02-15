@@ -3,6 +3,11 @@ import torch.utils.data
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 
+def get_infinite_batches(data_loader):
+    while True:
+        for i, (images, _) in enumerate(data_loader):
+            yield images
+
 def get_dataset(name, image_size, batch_size, workers):
     if name == 'celeba':
         celeba_dataset = dset.ImageFolder(root='./celeba',
