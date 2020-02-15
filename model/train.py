@@ -31,11 +31,11 @@ num_epochs = 600
 n_critic = 5
 lambda_ = 10
 
-depth_modifier = 16
+depth_modifier = 8
 # (DEPTH):    512 256 128 64 32 16
-resolution_level_count = 6 # 4x4 is lowest, 2**(resolution_levels+1) is highest
+resolution_level_count = 6  # 4x4 is lowest, 2**(resolution_levels+1) is highest
 resolution_levels = [int(k) for k in 2**(2+np.arange(resolution_level_count))]
-depth_levels = [32, 16, 8, 4, 2, 1] # insert 32 on the left
+depth_levels = [32, 16, 8, 4, 2, 1]  # insert 32 on the left
 total_training_minutes = 10  # in minutes
 total_training_time = total_training_minutes*60
 training_time_per_level = 1.9**np.arange(resolution_level_count) #1.85 is a training hyperparameter
@@ -69,21 +69,35 @@ if (device.type == 'cuda') and (ngpu > 1):
 
 """
 # progressive growing tests
+print('-'*25, 'netD', '-'*25)
 
-netD.current_level = 5
-netD.transition_phase = True
+print(netD)
+print('-'*25, 'netG', '-'*25)
+
+print(netG)
+print('-'*25, 'gui_repaint', '-'*25)
+
+netG.current_level = 3
+netD.current_level = 3
+netG.transition_phase = False
+netD.transition_phase = False
 alpha = torch.as_tensor(0, dtype=torch.float, device=device)
 netD.alpha = alpha
+netG.alpha = alpha
 
 dataloader = dataset.get_dataset(dataset_str, resolution_levels[netD.current_level], batch_size, workers)
 data_cycler = dataset.get_infinite_batches(dataloader)
-
 images = data_cycler.__next__()
 images_tra = images.to(device)
 b_size = images_tra.size(0)
 
-out = netD(images_tra)
-print(out.shape)
+noise = torch.randn(13, z_size, 1, 1, device=device)
+print('-'*25, 'netG', '-'*25)
+out = netG(noise)
+print('-'*25, 'netD', '-'*25)
+
+out = netD(out)
+print('-'*25, 'done', '-'*25)
 
 exit()"""
 
@@ -119,7 +133,7 @@ def calc_gradient_penalty(netD, real_data, fake_data):
 
 
 transition_phase = False
-current_level = 5
+current_level = 1
 
 minus_one = torch.as_tensor(-1, dtype=torch.float, device=device)
 one = torch.as_tensor(1, dtype=torch.float, device=device)

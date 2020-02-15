@@ -50,22 +50,25 @@ class PrintLayer(nn.Module):
         self.string = ', '.join([str(k) for k in string_args])
 
     def forward(self, x):
-        print('PL:', self.string, x.shape)
+        #print('PL:', self.string, 'ACTUAL SHAPE:', x.shape)
         return x
 
 def get_gen_block(input_depth, res):
     print(input_depth, res)
 
     block = nn.Sequential(
-        #PrintLayer('block', input_depth, res),
-        nn.Conv2d(input_depth, input_depth//2, 3, 1, 1, bias=True),  # TODO: bias=False?
-        nn.LeakyReLU(0.2, inplace=True),
+        PrintLayer('GEN BLOCK', input_depth, res, res),
+        nn.Conv2d(input_depth, input_depth//2, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.01, inplace=True),
         # TODO: pixelnorm
-        nn.Conv2d(input_depth//2, input_depth//2, 3, 1, 1, bias=True),  # TODO: bias=False?
-        nn.LeakyReLU(0.2, inplace=True),
+        nn.Conv2d(input_depth//2, input_depth//2, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.01, inplace=True),
         # TODO: pixelnorm
     )
-    to_rgb_layer = nn.Conv2d(input_depth//2, 3, 1, 1, 0, bias=True)
+    to_rgb_layer = nn.Sequential(
+        nn.Conv2d(input_depth//2, 3, 1, 1, 0),
+        nn.Tanh(),
+    )
 
     return block, to_rgb_layer
 
@@ -80,15 +83,16 @@ class Generator(nn.Module):
         self.to_rgb_layers = torch.nn.ModuleList()
 
         self.blocks.append(nn.Sequential(
+            PrintLayer('GEN STEM', z_size//(4**2), 4, 4),
             # TODO: pixelnorm
-            nn.Conv2d(z_size//(4**2), depth_modifier * depth_levels[0], 3, 1, 1, bias=True),  # TODO: bias=False?
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(z_size//(4**2), depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
+            nn.LeakyReLU(0.01, inplace=True),
             # TODO: pixelnorm
-            nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1, bias=True),  # TODO: bias=False?
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
+            nn.LeakyReLU(0.01, inplace=True),
             # TODO: pixelnorm
         ))
-        self.to_rgb_layers.append(nn.Conv2d(depth_modifier * depth_levels[0], 3, 1, 1, 0, bias=True))
+        self.to_rgb_layers.append(nn.Conv2d(depth_modifier * depth_levels[0], 3, 1, 1, 0))
 
         for i in range(1, len(depth_levels)):
             block, to_rgb = get_gen_block(depth_levels[i-1]*depth_modifier, resolution_levels[i-1]) # res is input resolution for layer, INCLUDING upsampling
@@ -131,16 +135,17 @@ class Generator(nn.Module):
 
 def get_disc_block(input_depth, res):
     from_rgb_layer = nn.Sequential(
-        nn.Conv2d(3, input_depth, 1, 1, 0, bias=True),
-        nn.LeakyReLU(0.2, inplace=True),
+        nn.Conv2d(3, input_depth, 1, 1, 0),
+        nn.LeakyReLU(0.01, inplace=True),
     )
 
     block = nn.Sequential(
+        PrintLayer('DISC BLOCK', input_depth, res, res),
         #PrintLayer('discblock', input_depth, res),
-        nn.Conv2d(input_depth, input_depth, 3, 1, 1, bias=True),  # TODO: bias=False?
-        nn.LeakyReLU(0.2, inplace=True),
-        nn.Conv2d(input_depth, input_depth*2, 3, 1, 1, bias=True),  # TODO: bias=False?
-        nn.LeakyReLU(0.2, inplace=True),
+        nn.Conv2d(input_depth, input_depth, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.01, inplace=True),
+        nn.Conv2d(input_depth, input_depth*2, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.01, inplace=True),
     )
 
     return block, from_rgb_layer
@@ -161,13 +166,17 @@ class Discriminator(nn.Module):
             self.blocks.append(block)
             self.from_rgb_layers.append(from_rgb)
 
-        self.from_rgb_layers.append(nn.Conv2d(3, depth_modifier * depth_levels[0], 1, 1, 0, bias=True))
+        self.from_rgb_layers.append(nn.Sequential(
+            nn.Conv2d(3, depth_modifier * depth_levels[0], 1, 1, 0),
+            nn.LeakyReLU(0.01, inplace=True),
+        ))
         self.blocks.append(nn.Sequential(
+            PrintLayer('DISC STEM', depth_modifier * depth_levels[0], 8, 8),
             # TODO: Minibatch std
-            nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1, bias=True),  # TODO: bias=False?
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(depth_modifier * depth_levels[0], 1, 4, 1, 0, bias=True),  # TODO: bias=False?
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
+            nn.LeakyReLU(0.01, inplace=True),
+            nn.Conv2d(depth_modifier * depth_levels[0], 1, 4, 1, 0),  # TODO: bias=False?
+            nn.LeakyReLU(0.01, inplace=True),
         ))
 
         self.downsample = nn.AvgPool2d(2, stride=2, padding=0)
