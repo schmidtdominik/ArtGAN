@@ -6,7 +6,7 @@ import os
 
 # RESET: rm -rf ./PBN_crops/
 
-size = 256
+size = 512
 
 try:
     os.makedirs('./data/art_cropped_train/data/')

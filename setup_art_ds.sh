@@ -28,7 +28,7 @@ mv train data/train
 # While/After this:
 # crawl as much BAM data as you want # Warning partial downloads cannot be resumed if following commands have already been
 # executed since the "for f in ... mv" move command doesn't overwrite but instead renames files
-# cd data/bam_dataset_download; python3 data/bam_crawler.py; cd
+# cd data/bam_dataset_download; python3 bam_crawler.py; cd
 
 # After all this
 # Merge painter by numbers kaggle data in ./train with bam_dataset_download crawled files:

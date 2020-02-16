@@ -25,28 +25,29 @@ torch.manual_seed(seed)
 workers = 16
 ngpu = 1
 
-batch_size = 64
+batch_size = 16
 num_epochs = 600
 
 n_critic = 5
 lambda_ = 10
 
-depth_modifier = 8
+depth_modifier = 16
 # (DEPTH):    512 256 128 64 32 16
-resolution_level_count = 6  # 4x4 is lowest, 2**(resolution_levels+1) is highest
+resolution_level_count = 8  # 4x4 is lowest, 2**(resolution_levels+1) is highest
 resolution_levels = [int(k) for k in 2**(2+np.arange(resolution_level_count))]
-depth_levels = [32, 16, 8, 4, 2, 1]  # insert 32 on the left
-total_training_minutes = 10  # in minutes
+depth_levels = [32, 16, 16, 16, 8, 4, 2, 1]
+total_training_minutes = 22*60  # in minutes
 total_training_time = total_training_minutes*60
-training_time_per_level = 1.9**np.arange(resolution_level_count) #1.85 is a training hyperparameter
+training_time_per_level = 1.4**np.arange(resolution_level_count) #1.85 is a training hyperparameter
 training_time_per_level = (training_time_per_level/np.sum(training_time_per_level))*total_training_time
 assert len(depth_levels) == len(resolution_levels) == len(training_time_per_level)
 image_size = resolution_levels[-1]
 z_size = depth_levels[0]*depth_modifier
 print('output image size:', image_size)
 print('z size:', z_size)
+print('training time per level (hours):', training_time_per_level/(60*60))
 
-dataset_str = 'celeba'
+dataset_str = 'art'
 
 device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu >= 1) else "cpu")
 experiment = Experiment(api_key=open('cometml.key').read().strip(), project_name="artgan3", workspace="schmidtdominik")
@@ -65,7 +66,9 @@ if (device.type == 'cuda') and (ngpu > 1):
 # Apply the weights_init function to randomly initialize all weights to mean=0, stdev=0.2.
 #netD.apply(util.weights_init)
 
-# Establish convention for real and fake labels during training
+
+
+#print(netG)
 
 """
 # progressive growing tests
@@ -103,8 +106,8 @@ exit()"""
 
 
 # Setup Adam optimizers for both G and D
-optimizerD = optim.Adam(netD.parameters(), lr=0.0001, betas=(0.5, 0.9))
-optimizerG = optim.Adam(netG.parameters(), lr=0.0001, betas=(0.5, 0.9))
+optimizerD = optim.Adam(netD.parameters(), lr=0.00005, betas=(0.5, 0.9))
+optimizerG = optim.Adam(netG.parameters(), lr=0.00005, betas=(0.5, 0.9))
 
 
 
@@ -133,13 +136,14 @@ def calc_gradient_penalty(netD, real_data, fake_data):
 
 
 transition_phase = False
-current_level = 1
+current_level = 0
 
 minus_one = torch.as_tensor(-1, dtype=torch.float, device=device)
 one = torch.as_tensor(1, dtype=torch.float, device=device)
 dataloader = dataset.get_dataset(dataset_str, resolution_levels[current_level], batch_size, workers)
 data_cycler = dataset.get_infinite_batches(dataloader)
 level_begin = time()
+last_image_upload = time()
 for i in tqdm(itertools.count()):
     experiment.set_step(i)
     if time()-level_begin > training_time_per_level[current_level]/2:
@@ -152,6 +156,7 @@ for i in tqdm(itertools.count()):
             dataloader = dataset.get_dataset(dataset_str, resolution_levels[current_level], batch_size, workers)
             data_cycler = dataset.get_infinite_batches(dataloader)
             transition_phase = True
+        print('*'*25, 'step:', i, 'level:' + str(current_level), transition_phase, growing_alpha.item())
     assert not (transition_phase and current_level == 0)
     netG.current_level = current_level
     netD.current_level = current_level
@@ -160,7 +165,6 @@ for i in tqdm(itertools.count()):
     growing_alpha = torch.as_tensor((time() - level_begin)/(training_time_per_level[current_level]/2) if transition_phase else -2, dtype=torch.float, device=device)
     netG.alpha = growing_alpha
     netD.alpha = growing_alpha
-    print(current_level, transition_phase, growing_alpha.item())
 
     for p in netD.parameters():
         p.requires_grad_(True)
@@ -209,13 +213,14 @@ for i in tqdm(itertools.count()):
 
     # Output training stats
     if i % 10 == 0:
-        print('step:', i)
+        print('step:', i, 'level:' + str(current_level), transition_phase, growing_alpha.item())
 
         stats = {'D_cost': D_cost.item(), 'G_cost': G_cost.item(), 'Wasserstein_D': Wasserstein_D.item(), 'D_real': D_real.item(), 'D_fake': D_fake.item(), 'transition_phase': int(transition_phase), 'alpha': growing_alpha.item(), 'level_begin': level_begin}
         print(stats)
         experiment.log_metrics(stats)
 
-    if (i % 80 == 0):
+    if time()-last_image_upload > 60:
+        last_image_upload = time()
         fixed_noise = torch.randn(3, z_size, 1, 1, device=device)
         with torch.no_grad():
             fake = netG(fixed_noise).detach().cpu().numpy()

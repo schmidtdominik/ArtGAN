@@ -1,3 +1,5 @@
+import collections
+
 import torch
 import torch.nn as nn
 
@@ -50,23 +52,21 @@ class PrintLayer(nn.Module):
         self.string = ', '.join([str(k) for k in string_args])
 
     def forward(self, x):
-        #print('PL:', self.string, 'ACTUAL SHAPE:', x.shape)
+        print('PL:', self.string, 'ACTUAL SHAPE:', x.shape)
         return x
 
-def get_gen_block(input_depth, res):
-    print(input_depth, res)
-
+def get_gen_block(input_depth, output_depth, res=None):
     block = nn.Sequential(
-        PrintLayer('GEN BLOCK', input_depth, res, res),
-        nn.Conv2d(input_depth, input_depth//2, 3, 1, 1),  # TODO: bias=False?
-        nn.LeakyReLU(0.01, inplace=True),
-        # TODO: pixelnorm
-        nn.Conv2d(input_depth//2, input_depth//2, 3, 1, 1),  # TODO: bias=False?
-        nn.LeakyReLU(0.01, inplace=True),
-        # TODO: pixelnorm
+        #PrintLayer('GEN BLOCK', input_depth, res, res),
+        nn.Conv2d(input_depth, output_depth, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.2, inplace=True),
+        #PixelNormalization(),
+        nn.Conv2d(output_depth, output_depth, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.2, inplace=True),
+        #PixelNormalization(),
     )
     to_rgb_layer = nn.Sequential(
-        nn.Conv2d(input_depth//2, 3, 1, 1, 0),
+        nn.Conv2d(output_depth, 3, 1, 1, 0),
         nn.Tanh(),
     )
 
@@ -83,19 +83,19 @@ class Generator(nn.Module):
         self.to_rgb_layers = torch.nn.ModuleList()
 
         self.blocks.append(nn.Sequential(
-            PrintLayer('GEN STEM', z_size//(4**2), 4, 4),
-            # TODO: pixelnorm
+            #PrintLayer('GEN STEM', z_size//(4**2), 4, 4),
+            #PixelNormalization(),
             nn.Conv2d(z_size//(4**2), depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
-            nn.LeakyReLU(0.01, inplace=True),
-            # TODO: pixelnorm
+            nn.LeakyReLU(0.2, inplace=True),
+            #PixelNormalization(),
             nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
-            nn.LeakyReLU(0.01, inplace=True),
-            # TODO: pixelnorm
+            nn.LeakyReLU(0.2, inplace=True),
+            #PixelNormalization(),
         ))
         self.to_rgb_layers.append(nn.Conv2d(depth_modifier * depth_levels[0], 3, 1, 1, 0))
 
         for i in range(1, len(depth_levels)):
-            block, to_rgb = get_gen_block(depth_levels[i-1]*depth_modifier, resolution_levels[i-1]) # res is input resolution for layer, INCLUDING upsampling
+            block, to_rgb = get_gen_block(depth_levels[i-1]*depth_modifier, depth_levels[i]*depth_modifier, res=resolution_levels[i-1]) # res is input resolution for layer, INCLUDING upsampling
             self.blocks.append(block)
             self.to_rgb_layers.append(to_rgb)
 
@@ -106,7 +106,7 @@ class Generator(nn.Module):
     def forward(self, input):
         input = input.view(input.shape[0], -1, 4, 4)
         #print('reshaped z', input.shape)
-        intermediate_outputs = []
+        intermediate_outputs = collections.deque(maxlen=2)
         for i in range(0, self.current_level+1):
             if i != 0:
                 input = self.upsample(input)
@@ -133,19 +133,18 @@ class Generator(nn.Module):
 
 # GEN: nz 10 8 4 2 1 nc | DIS: nc 1 2 4 8 10 1
 
-def get_disc_block(input_depth, res):
+def get_disc_block(input_depth, output_depth, res=None):
     from_rgb_layer = nn.Sequential(
         nn.Conv2d(3, input_depth, 1, 1, 0),
-        nn.LeakyReLU(0.01, inplace=True),
+        nn.LeakyReLU(0.2, inplace=True),
     )
 
     block = nn.Sequential(
-        PrintLayer('DISC BLOCK', input_depth, res, res),
-        #PrintLayer('discblock', input_depth, res),
+        #PrintLayer('DISC BLOCK', input_depth, res, res),
         nn.Conv2d(input_depth, input_depth, 3, 1, 1),  # TODO: bias=False?
-        nn.LeakyReLU(0.01, inplace=True),
-        nn.Conv2d(input_depth, input_depth*2, 3, 1, 1),  # TODO: bias=False?
-        nn.LeakyReLU(0.01, inplace=True),
+        nn.LeakyReLU(0.2, inplace=True),
+        nn.Conv2d(input_depth, output_depth, 3, 1, 1),  # TODO: bias=False?
+        nn.LeakyReLU(0.2, inplace=True),
     )
 
     return block, from_rgb_layer
@@ -161,20 +160,21 @@ class Discriminator(nn.Module):
         self.blocks = torch.nn.ModuleList()
         self.from_rgb_layers = torch.nn.ModuleList()
 
-        for dl, res in list(zip(reversed(depth_levels), reversed(resolution_levels)))[:-1]:
-            block, from_rgb = get_disc_block(dl*depth_modifier, res)
+        k = list(reversed(depth_levels))
+        for i, dl in enumerate(k[:-1]):
+            block, from_rgb = get_disc_block(dl*depth_modifier, k[i+1]*depth_modifier)
             self.blocks.append(block)
             self.from_rgb_layers.append(from_rgb)
 
         self.from_rgb_layers.append(nn.Sequential(
             nn.Conv2d(3, depth_modifier * depth_levels[0], 1, 1, 0),
-            nn.LeakyReLU(0.01, inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
         ))
         self.blocks.append(nn.Sequential(
-            PrintLayer('DISC STEM', depth_modifier * depth_levels[0], 8, 8),
-            # TODO: Minibatch std
+            #PrintLayer('DISC STEM', depth_modifier * depth_levels[0], 8, 8),
+            #BatchStdConcat(), # next layer has +1 depth as input
             nn.Conv2d(depth_modifier * depth_levels[0], depth_modifier * depth_levels[0], 3, 1, 1),  # TODO: bias=False?
-            nn.LeakyReLU(0.01, inplace=True),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(depth_modifier * depth_levels[0], 1, 4, 1, 0),  # TODO: bias=False?
         ))
 
@@ -208,7 +208,6 @@ class Discriminator(nn.Module):
             #print('LR DOWNSAMPLED', lr.shape)
             lr = self.from_rgb_layers[array_index+1](lr)
             #print('LR FROM RGB', lr.shape)
-
             merged = self.alpha*hr+(1-self.alpha)*lr
             #print('MERGE', merged.shape)
             for i, l in enumerate(self.blocks[array_index+1:]):
